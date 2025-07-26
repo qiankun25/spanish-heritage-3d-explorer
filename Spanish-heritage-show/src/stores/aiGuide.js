@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import aiService from "../services/aiService.js";
 
 export const useAIGuideStore = defineStore("aiGuide", () => {
   // 核心状态
@@ -8,6 +9,7 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   const currentLanguage = ref("zh");
   const currentMonument = ref(null);
   const userProfile = ref({
+    id: `user_${Date.now()}_${Math.random().toString(36).substring(2)}`,
     interests: ["history", "architecture"],
     knowledgeLevel: "intermediate",
     preferredLanguage: "zh",
@@ -18,6 +20,9 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   const conversationHistory = ref([]);
   const isProcessing = ref(false);
   const currentContext = ref(null); // 用户当前关注的3D模型部分
+  const lastError = ref(null);
+  const isRetrying = ref(false);
+  const retryCount = ref(0);
 
   // AI导游角色定义
   const guideRoles = ref({
@@ -89,11 +94,16 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   });
 
   // AI核心方法
-  const askAI = async (question, context = null) => {
+  const askAI = async (question, context = null, maxRetries = 2) => {
     isProcessing.value = true;
+    lastError.value = null;
+
     try {
       const prompt = buildPrompt(question, context);
       const response = await callAIService(prompt);
+
+      // 重置重试计数
+      retryCount.value = 0;
 
       // 记录对话历史
       conversationHistory.value.push({
@@ -107,10 +117,54 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
       return response;
     } catch (error) {
       console.error("AI服务调用失败:", error);
-      return getErrorResponse();
+      lastError.value = error;
+
+      // 实现重试逻辑
+      if (retryCount.value < maxRetries && shouldRetry(error)) {
+        retryCount.value++;
+        isRetrying.value = true;
+
+        // 等待一段时间后重试
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount.value));
+
+        try {
+          const retryResponse = await askAI(question, context, maxRetries);
+          isRetrying.value = false;
+          return retryResponse;
+        } catch (retryError) {
+          isRetrying.value = false;
+          throw retryError;
+        }
+      }
+
+      // 记录错误到对话历史
+      conversationHistory.value.push({
+        question,
+        answer: getErrorResponse(error),
+        guide: currentGuide.value,
+        timestamp: new Date(),
+        context: currentContext.value,
+        isError: true,
+      });
+
+      return getErrorResponse(error);
     } finally {
       isProcessing.value = false;
     }
+  };
+
+  // 判断是否应该重试
+  const shouldRetry = (error) => {
+    const retryableErrors = [
+      'Network error',
+      'timeout',
+      'Rate limit exceeded',
+      'AI service is temporarily unavailable'
+    ];
+
+    return retryableErrors.some(retryableError =>
+      error.message.includes(retryableError)
+    );
   };
 
   const buildPrompt = (question, context) => {
@@ -129,26 +183,65 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   };
 
   const callAIService = async (prompt) => {
-    // 这里集成实际的AI服务（OpenAI, Claude等）
-    // 模拟AI响应
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(
-          `作为${prompt.role}，我来为您解答关于${
-            prompt.monument?.name || "这个古迹"
-          }的问题...`
-        );
-      }, 1000);
-    });
+    try {
+      const context = {
+        guide: currentGuide.value,
+        monument: currentMonument.value,
+        language: currentLanguage.value,
+        conversationHistory: conversationHistory.value,
+        currentContext: currentContext.value,
+        userId: userProfile.value.id || 'anonymous',
+        options: {
+          maxTokens: 2000,
+          temperature: 0.7
+        }
+      };
+
+      const response = await aiService.getResponse(prompt.question, context);
+      return response;
+    } catch (error) {
+      console.error("AI服务调用失败:", error);
+      throw error;
+    }
   };
 
-  const getErrorResponse = () => {
+  const getErrorResponse = (error = null) => {
+    const errorType = error?.message || 'generic';
+
     const responses = {
-      zh: "抱歉，我暂时无法回答您的问题，请稍后再试。",
-      en: "Sorry, I cannot answer your question at the moment. Please try again later.",
-      es: "Lo siento, no puedo responder tu pregunta en este momento. Inténtalo de nuevo más tarde.",
+      zh: {
+        'API authentication failed': "API认证失败，请检查配置。",
+        'Rate limit exceeded': "请求过于频繁，请稍后再试。",
+        'Network error': "网络连接失败，请检查网络连接。",
+        'AI service is temporarily unavailable': "AI服务暂时不可用，请稍后再试。",
+        'generic': "抱歉，我暂时无法回答您的问题，请稍后再试。"
+      },
+      en: {
+        'API authentication failed': "API authentication failed. Please check the configuration.",
+        'Rate limit exceeded': "Too many requests. Please wait a moment before trying again.",
+        'Network error': "Network connection failed. Please check your internet connection.",
+        'AI service is temporarily unavailable': "AI service is temporarily unavailable. Please try again later.",
+        'generic': "Sorry, I cannot answer your question at the moment. Please try again later."
+      },
+      es: {
+        'API authentication failed': "Falló la autenticación de la API. Por favor verifica la configuración.",
+        'Rate limit exceeded': "Demasiadas solicitudes. Por favor espera un momento antes de intentar de nuevo.",
+        'Network error': "Falló la conexión de red. Por favor verifica tu conexión a internet.",
+        'AI service is temporarily unavailable': "El servicio de IA no está disponible temporalmente. Inténtalo de nuevo más tarde.",
+        'generic': "Lo siento, no puedo responder tu pregunta en este momento. Inténtalo de nuevo más tarde."
+      }
     };
-    return responses[currentLanguage.value];
+
+    const langResponses = responses[currentLanguage.value] || responses.zh;
+
+    // Find matching error message or use generic
+    for (const [key, message] of Object.entries(langResponses)) {
+      if (errorType.includes(key)) {
+        return message;
+      }
+    }
+
+    return langResponses.generic;
   };
 
   // 智能推荐方法
@@ -289,6 +382,11 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
     }
   };
 
+  // 清理对话历史
+  const clearConversationHistory = () => {
+    conversationHistory.value = [];
+  };
+
   return {
     // 状态
     currentGuide,
@@ -300,6 +398,9 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
     isProcessing,
     currentContext,
     guideRoles,
+    lastError,
+    isRetrying,
+    retryCount,
 
     // 计算属性
     currentGuideInfo,
@@ -315,5 +416,6 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
     getPersonalizedRecommendations,
     startVoiceInteraction,
     speakResponse,
+    clearConversationHistory,
   };
 });

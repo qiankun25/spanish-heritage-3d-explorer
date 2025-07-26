@@ -17,57 +17,61 @@
           :class="{ active: currentLanguage === lang.code }" @click="setLanguage(lang.code)">
           {{ lang.flag }} {{ lang.name }}
         </button>
+        <!-- 清理对话历史按钮 -->
+        <button class="clear-btn" @click="clearConversationHistory" title="清理对话历史">
+          🗑️
+        </button>
       </div>
     </div>
 
     <!-- 聊天历史 -->
     <div class="chat-history" ref="chatHistory">
-      <div v-for="(message, index) in conversationHistory" :key="index" class="message" :class="{
-        'user-message': message.question,
-        'ai-message': message.answer,
-        'welcome-message': message.type === 'welcome'
-      }">
-        <!-- AI消息 -->
-        <div v-if="message.answer" class="ai-response">
-          <div class="guide-info">
-            <img :src="guideRoles[message.guide]?.avatar" :alt="guideRoles[message.guide]?.name[currentLanguage]"
-              class="guide-mini-avatar" />
-            <span class="guide-mini-name">
-              {{ guideRoles[message.guide]?.name[currentLanguage] }}
-            </span>
-            <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
-          </div>
-          <div class="message-content">
-            <p>{{ message.answer }}</p>
-
-            <!-- 如果有相关推荐 -->
-            <div v-if="message.recommendations" class="recommendations">
-              <h4>相关推荐</h4>
-              <div class="recommendation-list">
-                <button v-for="rec in message.recommendations" :key="rec.type" class="recommendation-btn"
-                  @click="handleRecommendation(rec)">
-                  {{ rec.title }}
-                </button>
-              </div>
+      <template v-for="(message, index) in conversationHistory" :key="index">
+        <!-- 用户消息 (如果存在问题，先显示用户消息) -->
+        <div v-if="message.question" class="message user-message">
+          <div class="user-question">
+            <div class="message-content">
+              <p>{{ message.question }}</p>
+            </div>
+            <div class="user-info">
+              <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
             </div>
           </div>
-
-          <!-- 语音播放按钮 -->
-          <button class="speak-btn" @click="speakResponse(message.answer)" :disabled="isSpeaking">
-            <i class="icon-volume"></i>
-          </button>
         </div>
 
-        <!-- 用户消息 -->
-        <div v-if="message.question" class="user-question">
-          <div class="message-content">
-            <p>{{ message.question }}</p>
-          </div>
-          <div class="user-info">
-            <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
+        <!-- AI消息 (然后显示AI回答) -->
+        <div v-if="message.answer" class="message ai-message" :class="{ 'welcome-message': message.type === 'welcome' }">
+          <div class="ai-response">
+            <div class="guide-info">
+              <img :src="guideRoles[message.guide]?.avatar" :alt="guideRoles[message.guide]?.name[currentLanguage]"
+                class="guide-mini-avatar" />
+              <span class="guide-mini-name">
+                {{ guideRoles[message.guide]?.name[currentLanguage] }}
+              </span>
+              <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
+            </div>
+            <div class="message-content">
+              <p>{{ message.answer }}</p>
+
+              <!-- 如果有相关推荐 -->
+              <div v-if="message.recommendations" class="recommendations">
+                <h4>相关推荐</h4>
+                <div class="recommendation-list">
+                  <button v-for="rec in message.recommendations" :key="rec.type" class="recommendation-btn"
+                    @click="handleRecommendation(rec)">
+                    {{ rec.title }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 语音播放按钮 -->
+            <button class="speak-btn" @click="speakResponse(message.answer)" :disabled="isSpeaking">
+              <i class="icon-volume"></i>
+            </button>
           </div>
         </div>
-      </div>
+      </template>
 
       <!-- AI正在思考 -->
       <div v-if="isProcessing" class="thinking-indicator">
@@ -226,6 +230,10 @@ const switchGuide = (roleId) => {
   scrollToBottom()
 }
 
+const clearConversationHistory = () => {
+  aiGuideStore.clearConversationHistory()
+}
+
 const setLanguage = (lang) => {
   aiGuideStore.setLanguage(lang)
   updateQuickQuestions(lang)
@@ -382,6 +390,22 @@ onMounted(() => {
   background: #3498db;
   color: white;
   border-color: #3498db;
+}
+
+.clear-btn {
+  padding: 8px 12px;
+  border: 1px solid #e74c3c;
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s;
+  margin-left: 10px;
+}
+
+.clear-btn:hover {
+  background: #e74c3c;
+  color: white;
 }
 
 .chat-history {
