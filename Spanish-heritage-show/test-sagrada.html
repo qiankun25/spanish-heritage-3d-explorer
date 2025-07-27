@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sagrada Familia Model Test</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        background: #f0f0f0;
+      }
+      #container {
+        width: 800px;
+        height: 600px;
+        border: 2px solid #ccc;
+        margin: 20px auto;
+        background: white;
+      }
+      #info {
+        text-align: center;
+        margin: 20px;
+      }
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 18px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">
+      <h1>Sagrada Familia 3D Model Test</h1>
+      <p>Testing the loading of shengjiatang.glb model</p>
+    </div>
+
+    <div id="container">
+      <div id="loading">Loading Sagrada Familia model...</div>
+    </div>
+
+    <script type="module">
+      import * as THREE from "./node_modules/three/build/three.module.js";
+      import { OrbitControls } from "./node_modules/three/examples/jsm/controls/OrbitControls.js";
+      import { GLTFLoader } from "./node_modules/three/examples/jsm/loaders/GLTFLoader.js";
+      import { DRACOLoader } from "./node_modules/three/examples/jsm/loaders/DRACOLoader.js";
+
+      // Scene setup
+      const container = document.getElementById("container");
+      const loading = document.getElementById("loading");
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf0f0f0);
+
+      const camera = new THREE.PerspectiveCamera(75, 800 / 600, 0.1, 1000);
+      camera.position.set(0, 10, 20);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(800, 600);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      container.appendChild(renderer.domElement);
+
+      // Controls
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(10, 10, 5);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      // Model loading
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath("/draco/");
+
+      const gltfLoader = new GLTFLoader();
+      gltfLoader.setDRACOLoader(dracoLoader);
+
+      console.log("Starting to load Sagrada Familia model...");
+
+      gltfLoader.load(
+        "/models/shengjiatang.glb",
+        (gltf) => {
+          console.log("Model loaded successfully!", gltf);
+
+          const model = gltf.scene;
+
+          // Calculate bounding box and center the model
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+
+          console.log("Model size:", size);
+          console.log("Model center:", center);
+
+          // Center the model
+          model.position.sub(center);
+
+          // Scale the model if needed
+          const maxDimension = Math.max(size.x, size.y, size.z);
+          if (maxDimension > 20) {
+            const scale = 20 / maxDimension;
+            model.scale.setScalar(scale);
+            console.log("Model scaled by:", scale);
+          }
+
+          scene.add(model);
+          loading.style.display = "none";
+
+          // Adjust camera position
+          camera.position.set(0, size.y * 0.5, size.z * 1.5);
+          controls.target.copy(model.position);
+          controls.update();
+        },
+        (progress) => {
+          const percent = Math.round((progress.loaded / progress.total) * 100);
+          loading.textContent = `Loading Sagrada Familia model... ${percent}%`;
+          console.log("Loading progress:", percent + "%");
+        },
+        (error) => {
+          console.error("Error loading model:", error);
+          loading.textContent = "Error loading model: " + error.message;
+          loading.style.color = "red";
+        }
+      );
+
+      // Render loop
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // Handle window resize
+      window.addEventListener("resize", () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+    </script>
+  </body>
+</html>

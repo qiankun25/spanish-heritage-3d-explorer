@@ -12,13 +12,13 @@
         <button @click="retryLoad" class="retry-btn">重试</button>
       </div>
 
-      <div v-else-if="modelLoaded" class="model-display">
-        <!-- Three.js 3D场景将在这里渲染 -->
+      <!-- Three.js 3D场景将在这里渲染 -->
+      <div class="model-display">
         <canvas ref="threeCanvas" class="three-canvas"></canvas>
 
         <!-- 交互热点 -->
-        <div v-for="point in interactivePoints" :key="point.id" class="hotspot" :style="getHotspotStyle(point)"
-          @click="selectHotspot(point.id)">
+        <div v-if="modelLoaded" v-for="point in interactivePoints" :key="point.id" class="hotspot"
+          :style="getHotspotStyle(point)" @click="selectHotspot(point.id)">
           <div class="hotspot-marker">
             <div class="pulse-ring"></div>
             <div class="hotspot-dot"></div>
@@ -32,15 +32,28 @@
 
     <!-- 控制面板 -->
     <div class="control-panel">
+      <!-- 搜索面板 -->
+      <div class="search-section">
+        <SearchPanel @result-select="handleSearchResult" />
+      </div>
+
       <!-- 相机控制 -->
       <div class="camera-controls">
         <button @click="resetCamera" class="control-btn">
           <i class="icon-home"></i>
           重置视角
         </button>
-        <button @click="toggleAutoRotate" class="control-btn">
+        <button @click="toggleAutoRotate" class="control-btn" :class="{ active: autoRotate }">
           <i class="icon-rotate"></i>
           自动旋转
+        </button>
+        <button @click="animateToPreset('front')" class="control-btn">
+          <i class="icon-view"></i>
+          正视图
+        </button>
+        <button @click="animateToPreset('top')" class="control-btn">
+          <i class="icon-view"></i>
+          俯视图
         </button>
       </div>
 
@@ -88,6 +101,14 @@
         </div>
       </div>
     </transition>
+
+    <!-- 通知系统 -->
+    <NotificationSystem ref="notificationSystem" />
+
+    <!-- 加载进度覆盖层 -->
+    <LoadingProgress :visible="showLoadingOverlay" :title="loadingTitle" :message="loadingMessage"
+      :progress="loadingProgress" :show-progress="loadingProgress > 0" spinner-type="circle"
+      @cancel="handleLoadingCancel" />
   </div>
 </template>
 
@@ -96,6 +117,12 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useMonumentStore } from '../stores/monument'
 import { useAIGuideStore } from '../stores/aiGuide'
 import * as THREE from 'three'
+import { SceneManager } from '../utils/SceneManager'
+import { CameraAnimator } from '../utils/CameraAnimator'
+import { InteractionManager } from '../utils/InteractionManager'
+import SearchPanel from './SearchPanel.vue'
+import NotificationSystem from './NotificationSystem.vue'
+import LoadingProgress from './LoadingProgress.vue'
 
 // Store
 const monumentStore = useMonumentStore()
@@ -106,10 +133,17 @@ const modelContainer = ref(null)
 const threeCanvas = ref(null)
 const showInfoPanel = ref(false)
 const autoRotate = ref(false)
+const loadingProgress = ref(0)
+const notificationSystem = ref(null)
+const showLoadingOverlay = ref(false)
+const loadingTitle = ref('加载中...')
+const loadingMessage = ref('')
 
-// Three.js 相关
-let scene, camera, renderer, controls
-let animationId
+// 3D场景管理
+let sceneManager = null
+let cameraAnimator = null
+let interactionManager = null
+let currentModel = null
 
 // 计算属性
 const isLoading = computed(() => monumentStore.isLoading)
@@ -122,81 +156,194 @@ const currentLanguage = computed(() => aiGuideStore.currentLanguage)
 
 // 方法
 const initThreeJS = () => {
-  if (!threeCanvas.value) return
-
-  // 创建场景
-  scene = new THREE.Scene()
-  scene.background = new THREE.Color(0xf0f0f0)
-
-  // 创建相机
-  camera = new THREE.PerspectiveCamera(
-    75,
-    threeCanvas.value.clientWidth / threeCanvas.value.clientHeight,
-    0.1,
-    1000
-  )
-  camera.position.set(0, 5, 10)
-
-  // 创建渲染器
-  renderer = new THREE.WebGLRenderer({
-    canvas: threeCanvas.value,
-    antialias: true
-  })
-  renderer.setSize(threeCanvas.value.clientWidth, threeCanvas.value.clientHeight)
-  renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
-
-  // 添加光源
-  const ambientLight = new THREE.AmbientLight(0x404040, 0.6)
-  scene.add(ambientLight)
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-  directionalLight.position.set(10, 10, 5)
-  directionalLight.castShadow = true
-  scene.add(directionalLight)
-
-  // 开始渲染循环
-  animate()
-}
-
-const animate = () => {
-  animationId = requestAnimationFrame(animate)
-
-  if (autoRotate.value && scene) {
-    scene.rotation.y += 0.005
+  if (!threeCanvas.value) {
+    console.error('Canvas element not found')
+    return
   }
 
-  renderer.render(scene, camera)
+  try {
+    console.log('Initializing 3D scene...')
+
+    // 创建场景管理器
+    sceneManager = new SceneManager(threeCanvas.value, {
+      enableShadows: true,
+      enableControls: true,
+      backgroundColor: 0xf0f0f0
+    })
+
+    // 创建相机动画器
+    cameraAnimator = new CameraAnimator(sceneManager.camera, sceneManager.controls)
+
+    // 创建交互管理器
+    interactionManager = new InteractionManager(sceneManager, cameraAnimator)
+
+    // 设置事件回调
+    sceneManager.onModelLoad = handleModelLoad
+    sceneManager.onModelError = handleModelError
+    interactionManager.onObjectClick = handleObjectClick
+    interactionManager.onHotspotClick = handleHotspotClick
+    interactionManager.onObjectHover = handleObjectHover
+
+    console.log('3D scene initialized successfully')
+    console.log('Scene manager:', sceneManager)
+    console.log('Canvas size:', threeCanvas.value.clientWidth, 'x', threeCanvas.value.clientHeight)
+  } catch (error) {
+    console.error('Failed to initialize 3D scene:', error)
+    monumentStore.setModelError('3D场景初始化失败')
+  }
 }
 
 const loadModel = async (modelPath) => {
-  // 这里应该使用GLTFLoader加载实际的GLB模型
-  // 现在创建一个简单的几何体作为占位符
-  const geometry = new THREE.BoxGeometry(2, 3, 2)
-  const material = new THREE.MeshLambertMaterial({ color: 0x8B4513 })
-  const cube = new THREE.Mesh(geometry, material)
-  cube.castShadow = true
-  cube.receiveShadow = true
-  scene.add(cube)
-}
+  if (!sceneManager) {
+    console.error('Scene manager not initialized')
+    showNotification('场景未初始化', '请刷新页面重试', 'error')
+    return
+  }
 
-const getHotspotStyle = (point) => {
-  // 将3D坐标转换为屏幕坐标
-  const vector = new THREE.Vector3(point.position.x, point.position.y, point.position.z)
-  vector.project(camera)
+  try {
+    // 显示加载状态
+    showLoading('加载3D模型', '正在准备模型文件...')
 
-  const x = (vector.x * 0.5 + 0.5) * threeCanvas.value.clientWidth
-  const y = (vector.y * -0.5 + 0.5) * threeCanvas.value.clientHeight
+    // 清除之前的模型
+    if (currentModel) {
+      sceneManager.scene.remove(currentModel)
+      currentModel = null
+    }
 
-  return {
-    position: 'absolute',
-    left: `${x}px`,
-    top: `${y}px`,
-    transform: 'translate(-50%, -50%)'
+    updateLoadingProgress(20, '正在下载模型文件...')
+
+    // 加载新模型
+    console.log('Loading model:', modelPath)
+    currentModel = await sceneManager.loadModel(modelPath, {
+      scale: 1,
+      position: { x: 0, y: 0, z: 0 },
+      enableShadows: true,
+      makeInteractive: true
+    })
+
+    updateLoadingProgress(70, '正在处理模型数据...')
+
+    // 添加交互热点
+    if (interactionManager && currentMonument.value.interactivePoints) {
+      addInteractiveHotspots(currentMonument.value.interactivePoints)
+    }
+
+    updateLoadingProgress(90, '正在调整相机视角...')
+
+    // 动画到模型
+    try {
+      if (cameraAnimator && currentModel) {
+        await cameraAnimator.focusOnObject(currentModel, {
+          distance: 15,
+          duration: 2
+        })
+        console.log('Camera animation completed')
+      }
+    } catch (cameraError) {
+      console.warn('Camera animation failed:', cameraError)
+      // 相机动画失败不应该阻止模型加载完成
+    }
+
+    updateLoadingProgress(100, '加载完成')
+    console.log('Model loading completed, hiding loading overlay...')
+
+    // 立即隐藏加载界面，然后显示成功通知
+    hideLoading()
+    showNotification('模型加载成功', currentMonument.value?.name[currentLanguage.value], 'success')
+    monumentStore.setModelLoaded(true)
+  } catch (error) {
+    console.error('Failed to load model:', error)
+    hideLoading()
+    showNotification('模型加载失败', error.message, 'error')
+    monumentStore.setModelError('模型加载失败: ' + error.message)
   }
 }
 
-const selectHotspot = (hotspotId) => {
+// 模型加载成功回调
+const handleModelLoad = (model, gltf) => {
+  console.log('Model loaded successfully:', model)
+
+  // 处理动画（如果有）
+  if (gltf.animations && gltf.animations.length > 0) {
+    console.log('Model has animations:', gltf.animations.length)
+    showNotification('发现模型动画', `找到 ${gltf.animations.length} 个动画`, 'info')
+    // 这里可以添加动画处理逻辑
+  }
+}
+
+// 模型加载错误回调
+const handleModelError = (error) => {
+  console.error('Model loading error:', error)
+  hideLoading()
+  showNotification('模型加载失败', error.message, 'error')
+  monumentStore.setModelError('模型加载失败')
+}
+
+// 对象点击回调
+const handleObjectClick = (object, intersection) => {
+  console.log('Object clicked:', object)
+}
+
+// 热点点击回调
+const handleHotspotClick = (hotspot, intersection) => {
+  console.log('Hotspot clicked:', hotspot.userData)
+
+  if (hotspot.userData.id) {
+    selectHotspot(hotspot.userData.id)
+  }
+}
+
+// 对象悬停回调
+const handleObjectHover = (object) => {
+  console.log('Object hovered:', object.userData)
+}
+
+const getHotspotStyle = (point) => {
+  // 检查必要的依赖
+  if (!sceneManager || !sceneManager.camera || !threeCanvas.value) {
+    return {
+      position: 'absolute',
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)',
+      display: 'none' // 隐藏直到场景准备好
+    }
+  }
+
+  try {
+    // 将3D坐标转换为屏幕坐标
+    const vector = new THREE.Vector3(point.position.x, point.position.y, point.position.z)
+    vector.project(sceneManager.camera)
+
+    const x = (vector.x * 0.5 + 0.5) * threeCanvas.value.clientWidth
+    const y = (vector.y * -0.5 + 0.5) * threeCanvas.value.clientHeight
+
+    // 检查坐标是否在视口内
+    const isVisible = x >= 0 && x <= threeCanvas.value.clientWidth &&
+      y >= 0 && y <= threeCanvas.value.clientHeight &&
+      vector.z < 1 // 确保在相机前方
+
+    return {
+      position: 'absolute',
+      left: `${x}px`,
+      top: `${y}px`,
+      transform: 'translate(-50%, -50%)',
+      display: isVisible ? 'block' : 'none',
+      zIndex: Math.round((1 - vector.z) * 1000) // 根据深度设置z-index
+    }
+  } catch (error) {
+    console.warn('Error calculating hotspot style:', error)
+    return {
+      position: 'absolute',
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)',
+      display: 'none'
+    }
+  }
+}
+
+const selectHotspot = async (hotspotId) => {
   monumentStore.selectHotspot(hotspotId)
 
   // 通知AI导游用户选择了热点
@@ -206,17 +353,188 @@ const selectHotspot = (hotspotId) => {
       type: 'hotspot',
       data: hotspot
     })
+
+    // 使用新的动画方法
+    await animateToHotspot(hotspot)
+
+    // 显示信息面板
+    showInfoPanel.value = true
   }
 }
 
-const resetCamera = () => {
+const resetCamera = async () => {
   monumentStore.resetCamera()
-  camera.position.set(0, 5, 10)
-  camera.lookAt(0, 0, 0)
+
+  if (cameraAnimator) {
+    await cameraAnimator.animateToPreset('isometric', { duration: 1.5 })
+  }
 }
 
 const toggleAutoRotate = () => {
   autoRotate.value = !autoRotate.value
+
+  if (autoRotate.value && currentModel && cameraAnimator) {
+    // 开始自动旋转动画
+    startAutoRotation()
+  }
+}
+
+const startAutoRotation = () => {
+  if (!autoRotate.value || !currentModel || !cameraAnimator) return
+
+  const center = new THREE.Vector3()
+  const box = new THREE.Box3().setFromObject(currentModel)
+  box.getCenter(center)
+
+  cameraAnimator.animateOrbit(center, 15, 0, Math.PI * 2, {
+    duration: 10,
+    onComplete: () => {
+      if (autoRotate.value) {
+        startAutoRotation() // 循环旋转
+      }
+    }
+  })
+}
+
+// 动画到预设视角
+const animateToPreset = async (presetName) => {
+  if (!cameraAnimator) return
+
+  try {
+    await cameraAnimator.animateToPreset(presetName, {
+      duration: 1.5,
+      ease: "power2.inOut"
+    })
+  } catch (error) {
+    console.error('Failed to animate to preset:', error)
+  }
+}
+
+// 平滑过渡到热点
+const animateToHotspot = async (hotspot) => {
+  if (!cameraAnimator) return
+
+  const targetPosition = {
+    x: hotspot.position.x + 3,
+    y: hotspot.position.y + 2,
+    z: hotspot.position.z + 3
+  }
+
+  try {
+    await cameraAnimator.animateToPosition(targetPosition, hotspot.position, {
+      duration: 2,
+      ease: "power2.inOut"
+    })
+  } catch (error) {
+    console.error('Failed to animate to hotspot:', error)
+  }
+}
+
+// 处理搜索结果选择
+const handleSearchResult = async (result) => {
+  console.log('Search result selected:', result)
+
+  try {
+    if (result.type === 'monument') {
+      // 切换到选中的古迹
+      showNotification('正在切换古迹', result.title, 'info')
+      await monumentStore.loadMonument(result.data.id)
+    } else if (result.type === 'hotspot') {
+      // 导航到热点
+      showNotification('正在导航到热点', result.title, 'info')
+      await selectHotspot(result.data.id)
+    }
+
+    // 显示成功提示
+    showNotification('导航成功', '已到达: ' + result.title, 'success')
+  } catch (error) {
+    console.error('Failed to navigate to search result:', error)
+    showNotification('导航失败', '无法到达指定位置', 'error')
+  }
+}
+
+// 显示通知
+const showNotification = (title, message = '', type = 'info') => {
+  if (notificationSystem.value) {
+    switch (type) {
+      case 'success':
+        notificationSystem.value.showSuccess(title, message)
+        break
+      case 'error':
+        notificationSystem.value.showError(title, message)
+        break
+      case 'warning':
+        notificationSystem.value.showWarning(title, message)
+        break
+      default:
+        notificationSystem.value.showInfo(title, message)
+    }
+  }
+}
+
+// 显示加载状态
+const showLoading = (title, message = '') => {
+  showLoadingOverlay.value = true
+  loadingTitle.value = title
+  loadingMessage.value = message
+  loadingProgress.value = 0
+
+  // 设置一个备用的超时隐藏机制，防止界面卡住
+  setTimeout(() => {
+    if (showLoadingOverlay.value && loadingProgress.value >= 90) {
+      console.warn('Loading overlay timeout, force hiding...')
+      hideLoading()
+    }
+  }, 10000) // 10秒超时
+}
+
+// 更新加载进度
+const updateLoadingProgress = (progress, message = '') => {
+  loadingProgress.value = Math.max(0, Math.min(100, progress))
+  if (message) {
+    loadingMessage.value = message
+  }
+}
+
+// 隐藏加载状态
+const hideLoading = () => {
+  showLoadingOverlay.value = false
+  loadingProgress.value = 0
+}
+
+// 处理加载取消
+const handleLoadingCancel = () => {
+  hideLoading()
+  showNotification('操作已取消', '', 'info')
+}
+
+// 添加交互热点
+const addInteractiveHotspots = (hotspots) => {
+  if (!interactionManager) return
+
+  // 清除之前的热点
+  interactionManager.clearInteractiveObjects()
+
+  hotspots.forEach(hotspot => {
+    const hotspotMesh = interactionManager.addHotspot(
+      hotspot.position,
+      {
+        id: hotspot.id,
+        title: hotspot.title[currentLanguage.value],
+        description: hotspot.description[currentLanguage.value],
+        data: hotspot
+      }
+    )
+
+    console.log('Added hotspot:', hotspot.id)
+  })
+}
+
+// 根据对象查找对应的热点
+const findHotspotByObject = (object) => {
+  return interactivePoints.value.find(point => {
+    return object.userData && object.userData.id === point.id
+  })
 }
 
 const toggleInfoPanel = () => {
@@ -230,43 +548,61 @@ const retryLoad = () => {
 }
 
 // 监听器
-watch(modelLoaded, (loaded) => {
-  if (loaded && currentMonument.value) {
-    loadModel(currentMonument.value.modelPath)
+watch(currentMonument, async (newMonument) => {
+  if (newMonument && newMonument.modelPath && sceneManager) {
+    await loadModel(newMonument.modelPath)
   }
 })
 
-watch(() => monumentStore.cameraPosition, (newPos) => {
-  if (camera) {
-    camera.position.set(newPos.x, newPos.y, newPos.z)
+watch(() => monumentStore.cameraPosition, async (newPos) => {
+  if (cameraAnimator && newPos) {
+    await cameraAnimator.animateToPosition(newPos, null, { duration: 1 })
+  }
+})
+
+watch(autoRotate, (rotating) => {
+  if (!rotating && cameraAnimator) {
+    cameraAnimator.stopCurrentAnimation()
   }
 })
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   initThreeJS()
 
-  // 处理窗口大小变化
-  const handleResize = () => {
-    if (camera && renderer && threeCanvas.value) {
-      camera.aspect = threeCanvas.value.clientWidth / threeCanvas.value.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(threeCanvas.value.clientWidth, threeCanvas.value.clientHeight)
-    }
+  // 确保canvas可见
+  monumentStore.setModelLoaded(false)
+  monumentStore.setModelError(null)
+
+  // 初始化完成后，如果有当前古迹，则加载模型
+  if (currentMonument.value && currentMonument.value.modelPath) {
+    await loadModel(currentMonument.value.modelPath)
+  }
+})
+
+onUnmounted(() => {
+  // 停止自动旋转
+  autoRotate.value = false
+
+  // 清理交互管理器
+  if (interactionManager) {
+    interactionManager.dispose()
+    interactionManager = null
   }
 
-  window.addEventListener('resize', handleResize)
+  // 清理相机动画器
+  if (cameraAnimator) {
+    cameraAnimator.stopCurrentAnimation()
+    cameraAnimator = null
+  }
 
-  // 清理函数
-  onUnmounted(() => {
-    window.removeEventListener('resize', handleResize)
-    if (animationId) {
-      cancelAnimationFrame(animationId)
-    }
-    if (renderer) {
-      renderer.dispose()
-    }
-  })
+  // 清理场景管理器
+  if (sceneManager) {
+    sceneManager.dispose()
+    sceneManager = null
+  }
+
+  currentModel = null
 })
 </script>
 
@@ -397,8 +733,13 @@ onMounted(() => {
   right: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
   z-index: 10;
+}
+
+.search-section {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .camera-controls,
@@ -527,5 +868,26 @@ onMounted(() => {
 .slide-up-enter-from,
 .slide-up-leave-to {
   transform: translateY(100%);
+}
+
+/* 图标样式 */
+.icon-home::before {
+  content: '🏠';
+}
+
+.icon-rotate::before {
+  content: '🔄';
+}
+
+.icon-info::before {
+  content: 'ℹ️';
+}
+
+.icon-view::before {
+  content: '👁️';
+}
+
+.icon-search::before {
+  content: '🔍';
 }
 </style>
