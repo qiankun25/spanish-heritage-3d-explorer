@@ -18,7 +18,7 @@
           {{ lang.flag }} {{ lang.name }}
         </button>
         <!-- 清理对话历史按钮 -->
-        <button class="clear-btn" @click="clearConversationHistory" title="清理对话历史">
+        <button class="clear-btn" @click="clearConversationHistory" title="Clear Chat History">
           🗑️
         </button>
       </div>
@@ -40,7 +40,8 @@
         </div>
 
         <!-- AI消息 (然后显示AI回答) -->
-        <div v-if="message.answer" class="message ai-message" :class="{ 'welcome-message': message.type === 'welcome' }">
+        <div v-if="message.answer" class="message ai-message"
+          :class="{ 'welcome-message': message.type === 'welcome' }">
           <div class="ai-response">
             <div class="guide-info">
               <img :src="guideRoles[message.guide]?.avatar" :alt="guideRoles[message.guide]?.name[currentLanguage]"
@@ -99,8 +100,8 @@
 
       <!-- 输入框 -->
       <div class="input-container">
-        <input v-model="userInput" type="text" placeholder="请输入您的问题..." @keyup.enter="sendMessage" @input="handleInput"
-          class="message-input" :disabled="isProcessing" />
+        <input v-model="userInput" type="text" placeholder="Ask your question..." @keyup.enter="sendMessage"
+          @input="handleInput" class="message-input" :disabled="isProcessing" />
 
         <!-- 语音输入按钮 -->
         <button class="voice-btn" :class="{ active: isListening, disabled: isProcessing }" @click="toggleVoiceInput"
@@ -152,17 +153,17 @@ const chatHistory = ref(null)
 
 // 语言选项
 const languages = ref([
-  { code: 'zh', name: '中文', flag: '🇨🇳' },
   { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
   { code: 'es', name: 'Español', flag: '🇪🇸' }
 ])
 
 // 快速问题建议
 const quickQuestions = ref([
-  { id: 1, text: '这个建筑有什么历史意义？' },
-  { id: 2, text: '建造这个古迹用了多长时间？' },
-  { id: 3, text: '这里有什么有趣的传说吗？' },
-  { id: 4, text: '这个建筑风格有什么特点？' }
+  { id: 1, text: 'What is the historical significance of this building?' },
+  { id: 2, text: 'How long did it take to build this monument?' },
+  { id: 3, text: 'Are there any interesting legends here?' },
+  { id: 4, text: 'What are the characteristics of this architectural style?' }
 ])
 
 // 计算属性
@@ -260,7 +261,7 @@ const updateQuickQuestions = (lang) => {
       { id: 4, text: '¿Cuáles son las características de este estilo arquitectónico?' }
     ]
   }
-  quickQuestions.value = questions[lang] || questions.zh
+  quickQuestions.value = questions[lang] || questions.en
 }
 
 const handleRecommendation = (recommendation) => {
@@ -274,7 +275,7 @@ const handleRecommendation = (recommendation) => {
       break
     default:
       // 发送相关问题
-      userInput.value = `告诉我更多关于${recommendation.title}的信息`
+      userInput.value = `Tell me more about ${recommendation.title}`
       sendMessage()
   }
 }

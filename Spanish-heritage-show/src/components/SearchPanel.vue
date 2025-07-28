@@ -3,7 +3,7 @@
     <!-- 搜索触发按钮 -->
     <button @click="toggleSearch" class="search-trigger" :class="{ active: isExpanded }">
       <i class="icon-search"></i>
-      <span v-if="!isExpanded">搜索</span>
+      <span v-if="!isExpanded">Search</span>
     </button>
 
     <!-- 搜索面板内容 -->
@@ -12,7 +12,8 @@
         <!-- 搜索输入框 -->
         <div class="search-input-container">
           <input ref="searchInput" v-model="searchQuery" @input="handleSearch" @keyup.enter="selectFirstResult"
-            @keyup.escape="closeSearch" type="text" placeholder="搜索古迹、热点或位置..." class="search-input" />
+            @keyup.escape="closeSearch" type="text" placeholder="Search monuments, hotspots or locations..."
+            class="search-input" />
           <button @click="clearSearch" class="clear-btn" v-if="searchQuery">
             <i class="icon-close"></i>
           </button>
@@ -21,7 +22,7 @@
         <!-- 搜索结果 -->
         <div v-if="searchResults.length > 0" class="search-results">
           <div class="results-header">
-            <span>找到 {{ searchResults.length }} 个结果</span>
+            <span>Found {{ searchResults.length }} results</span>
           </div>
 
           <div class="results-list">
@@ -45,13 +46,13 @@
         <!-- 无结果提示 -->
         <div v-else-if="searchQuery && !isSearching" class="no-results">
           <i class="icon-no-results"></i>
-          <p>未找到相关结果</p>
-          <p class="suggestion">尝试使用其他关键词</p>
+          <p>No results found</p>
+          <p class="suggestion">Try using different keywords</p>
         </div>
 
         <!-- 搜索建议 -->
         <div v-if="!searchQuery" class="search-suggestions">
-          <div class="suggestions-header">热门搜索</div>
+          <div class="suggestions-header">Popular Searches</div>
           <div class="suggestions-list">
             <button v-for="suggestion in popularSearches" :key="suggestion"
               @click="searchQuery = suggestion; handleSearch()" class="suggestion-item">
@@ -63,7 +64,7 @@
         <!-- 加载状态 -->
         <div v-if="isSearching" class="search-loading">
           <div class="loading-spinner"></div>
-          <span>搜索中...</span>
+          <span>Searching...</span>
         </div>
       </div>
     </transition>
@@ -97,14 +98,14 @@ const searchInput = ref(null)
 
 // 热门搜索建议
 const popularSearches = ref([
-  '阿尔罕布拉宫',
-  '圣家族大教堂',
-  '塞维利亚王宫',
-  '凯旋门',
-  '狮子庭院',
-  '伊斯兰建筑',
-  '高迪作品',
-  '新古典主义'
+  'Alhambra',
+  'Sagrada Familia',
+  'Alcázar of Seville',
+  'Arc de Triomphe',
+  'Court of Lions',
+  'Islamic Architecture',
+  'Gaudí Works',
+  'Neoclassical'
 ])
 
 // 计算属性
@@ -155,7 +156,7 @@ const handleSearch = async () => {
         type: 'monument',
         title: monument.name[currentLanguage.value],
         description: monument.description[currentLanguage.value],
-        category: '古迹',
+        category: 'Monument',
         data: monument
       })
     })

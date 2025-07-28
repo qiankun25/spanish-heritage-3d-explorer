@@ -330,7 +330,7 @@ export const useMonumentStore = defineStore("monument", () => {
     return spanishMonuments.value.filter((m) => m.category === category);
   };
 
-  const searchMonuments = (query, language = "zh") => {
+  const searchMonuments = (query, language = "en") => {
     return spanishMonuments.value.filter(
       (monument) =>
         monument.name[language].toLowerCase().includes(query.toLowerCase()) ||

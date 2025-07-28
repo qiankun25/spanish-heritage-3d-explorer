@@ -6,13 +6,13 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   // 核心状态
   const currentGuide = ref("historian");
   const isListening = ref(false);
-  const currentLanguage = ref("zh");
+  const currentLanguage = ref("en");
   const currentMonument = ref(null);
   const userProfile = ref({
     id: `user_${Date.now()}_${Math.random().toString(36).substring(2)}`,
     interests: ["history", "architecture"],
     knowledgeLevel: "intermediate",
-    preferredLanguage: "zh",
+    preferredLanguage: "en",
     visitHistory: [],
   });
 
@@ -125,7 +125,9 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
         isRetrying.value = true;
 
         // 等待一段时间后重试
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount.value));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * retryCount.value)
+        );
 
         try {
           const retryResponse = await askAI(question, context, maxRetries);
@@ -156,13 +158,13 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   // 判断是否应该重试
   const shouldRetry = (error) => {
     const retryableErrors = [
-      'Network error',
-      'timeout',
-      'Rate limit exceeded',
-      'AI service is temporarily unavailable'
+      "Network error",
+      "timeout",
+      "Rate limit exceeded",
+      "AI service is temporarily unavailable",
     ];
 
-    return retryableErrors.some(retryableError =>
+    return retryableErrors.some((retryableError) =>
       error.message.includes(retryableError)
     );
   };
@@ -190,11 +192,11 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
         language: currentLanguage.value,
         conversationHistory: conversationHistory.value,
         currentContext: currentContext.value,
-        userId: userProfile.value.id || 'anonymous',
+        userId: userProfile.value.id || "anonymous",
         options: {
           maxTokens: 2000,
-          temperature: 0.7
-        }
+          temperature: 0.7,
+        },
       };
 
       const response = await aiService.getResponse(prompt.question, context);
@@ -206,33 +208,44 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
   };
 
   const getErrorResponse = (error = null) => {
-    const errorType = error?.message || 'generic';
+    const errorType = error?.message || "generic";
 
     const responses = {
       zh: {
-        'API authentication failed': "API认证失败，请检查配置。",
-        'Rate limit exceeded': "请求过于频繁，请稍后再试。",
-        'Network error': "网络连接失败，请检查网络连接。",
-        'AI service is temporarily unavailable': "AI服务暂时不可用，请稍后再试。",
-        'generic': "抱歉，我暂时无法回答您的问题，请稍后再试。"
+        "API authentication failed": "API认证失败，请检查配置。",
+        "Rate limit exceeded": "请求过于频繁，请稍后再试。",
+        "Network error": "网络连接失败，请检查网络连接。",
+        "AI service is temporarily unavailable":
+          "AI服务暂时不可用，请稍后再试。",
+        generic: "抱歉，我暂时无法回答您的问题，请稍后再试。",
       },
       en: {
-        'API authentication failed': "API authentication failed. Please check the configuration.",
-        'Rate limit exceeded': "Too many requests. Please wait a moment before trying again.",
-        'Network error': "Network connection failed. Please check your internet connection.",
-        'AI service is temporarily unavailable': "AI service is temporarily unavailable. Please try again later.",
-        'generic': "Sorry, I cannot answer your question at the moment. Please try again later."
+        "API authentication failed":
+          "API authentication failed. Please check the configuration.",
+        "Rate limit exceeded":
+          "Too many requests. Please wait a moment before trying again.",
+        "Network error":
+          "Network connection failed. Please check your internet connection.",
+        "AI service is temporarily unavailable":
+          "AI service is temporarily unavailable. Please try again later.",
+        generic:
+          "Sorry, I cannot answer your question at the moment. Please try again later.",
       },
       es: {
-        'API authentication failed': "Falló la autenticación de la API. Por favor verifica la configuración.",
-        'Rate limit exceeded': "Demasiadas solicitudes. Por favor espera un momento antes de intentar de nuevo.",
-        'Network error': "Falló la conexión de red. Por favor verifica tu conexión a internet.",
-        'AI service is temporarily unavailable': "El servicio de IA no está disponible temporalmente. Inténtalo de nuevo más tarde.",
-        'generic': "Lo siento, no puedo responder tu pregunta en este momento. Inténtalo de nuevo más tarde."
-      }
+        "API authentication failed":
+          "Falló la autenticación de la API. Por favor verifica la configuración.",
+        "Rate limit exceeded":
+          "Demasiadas solicitudes. Por favor espera un momento antes de intentar de nuevo.",
+        "Network error":
+          "Falló la conexión de red. Por favor verifica tu conexión a internet.",
+        "AI service is temporarily unavailable":
+          "El servicio de IA no está disponible temporalmente. Inténtalo de nuevo más tarde.",
+        generic:
+          "Lo siento, no puedo responder tu pregunta en este momento. Inténtalo de nuevo más tarde.",
+      },
     };
 
-    const langResponses = responses[currentLanguage.value] || responses.zh;
+    const langResponses = responses[currentLanguage.value] || responses.en;
 
     // Find matching error message or use generic
     for (const [key, message] of Object.entries(langResponses)) {
@@ -316,7 +329,7 @@ export const useAIGuideStore = defineStore("aiGuide", () => {
       en: "en-US",
       es: "es-ES",
     };
-    return langMap[currentLanguage.value] || "zh-CN";
+    return langMap[currentLanguage.value] || "en-US";
   };
 
   // 基础方法

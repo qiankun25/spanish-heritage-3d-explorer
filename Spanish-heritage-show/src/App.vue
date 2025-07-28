@@ -42,22 +42,14 @@ onMounted(async () => {
     <header class="app-header" v-if="!isFullscreen">
       <div class="header-content">
         <div class="logo-section">
-          <h1>🏛️ 西班牙文化古迹展示平台</h1>
-          <p>Spanish Cultural Heritage Explorer</p>
+          <h1>🏛️ Spanish Cultural Heritage Explorer</h1>
+          <p>Explore Spain's Rich Cultural Heritage in 3D</p>
         </div>
-        
+
         <!-- 古迹选择器 -->
         <div class="monument-selector">
-          <select 
-            v-model="selectedMonument" 
-            @change="selectMonument(selectedMonument)"
-            class="monument-select"
-          >
-            <option 
-              v-for="monument in monumentStore.availableMonuments" 
-              :key="monument.id"
-              :value="monument.id"
-            >
+          <select v-model="selectedMonument" @change="selectMonument(selectedMonument)" class="monument-select">
+            <option v-for="monument in monumentStore.availableMonuments" :key="monument.id" :value="monument.id">
               {{ monument.name[aiGuideStore.currentLanguage] }}
             </option>
           </select>
@@ -67,11 +59,11 @@ onMounted(async () => {
         <div class="header-controls">
           <button @click="toggleChat" class="control-btn">
             <i class="icon-chat"></i>
-            {{ showChat ? '隐藏导游' : '显示导游' }}
+            {{ showChat ? 'Hide Guide' : 'Show Guide' }}
           </button>
           <button @click="toggleFullscreen" class="control-btn">
             <i class="icon-fullscreen"></i>
-            全屏模式
+            Fullscreen
           </button>
         </div>
       </div>
@@ -82,16 +74,16 @@ onMounted(async () => {
       <!-- 3D展示区域 -->
       <div class="viewer-container" :class="{ 'full-width': !showChat }">
         <MonumentViewer />
-        
+
         <!-- 全屏模式控制 -->
         <div v-if="isFullscreen" class="fullscreen-controls">
           <button @click="toggleFullscreen" class="fullscreen-btn">
             <i class="icon-exit-fullscreen"></i>
-            退出全屏
+            Exit Fullscreen
           </button>
           <button @click="toggleChat" class="fullscreen-btn">
             <i class="icon-chat"></i>
-            {{ showChat ? '隐藏' : '显示' }}导游
+            {{ showChat ? 'Hide' : 'Show' }} Guide
           </button>
         </div>
       </div>
@@ -106,7 +98,7 @@ onMounted(async () => {
     <div v-if="monumentStore.isLoading" class="loading-overlay">
       <div class="loading-content">
         <div class="loading-spinner"></div>
-        <h3>正在加载古迹模型...</h3>
+        <h3>Loading Monument Model...</h3>
         <p>{{ monumentStore.currentMonument?.name[aiGuideStore.currentLanguage] }}</p>
       </div>
     </div>
@@ -136,7 +128,7 @@ onMounted(async () => {
   background: white;
   border-bottom: 1px solid #e0e0e0;
   padding: 15px 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
@@ -289,8 +281,13 @@ onMounted(async () => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-content h3 {
@@ -310,31 +307,57 @@ onMounted(async () => {
     flex-direction: column;
     gap: 15px;
   }
-  
+
   .app-main {
     flex-direction: column;
   }
-  
+
   .chat-container {
     width: 100%;
     height: 300px;
     border-left: none;
     border-top: 1px solid #e0e0e0;
   }
-  
+
   .viewer-container.full-width {
     height: calc(100vh - 200px);
   }
 }
 
 /* 图标样式 */
-.icon-chat::before { content: '💬'; }
-.icon-fullscreen::before { content: '⛶'; }
-.icon-exit-fullscreen::before { content: '⛶'; }
-.icon-home::before { content: '🏠'; }
-.icon-rotate::before { content: '🔄'; }
-.icon-info::before { content: 'ℹ️'; }
-.icon-volume::before { content: '🔊'; }
-.icon-mic::before { content: '🎤'; }
-.icon-send::before { content: '📤'; }
+.icon-chat::before {
+  content: '💬';
+}
+
+.icon-fullscreen::before {
+  content: '⛶';
+}
+
+.icon-exit-fullscreen::before {
+  content: '⛶';
+}
+
+.icon-home::before {
+  content: '🏠';
+}
+
+.icon-rotate::before {
+  content: '🔄';
+}
+
+.icon-info::before {
+  content: 'ℹ️';
+}
+
+.icon-volume::before {
+  content: '🔊';
+}
+
+.icon-mic::before {
+  content: '🎤';
+}
+
+.icon-send::before {
+  content: '📤';
+}
 </style>

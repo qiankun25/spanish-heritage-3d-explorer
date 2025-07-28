@@ -4,12 +4,12 @@
     <div class="model-container" ref="modelContainer">
       <div v-if="isLoading" class="loading-overlay">
         <div class="loading-spinner"></div>
-        <p>正在加载3D模型...</p>
+        <p>Loading 3D Model...</p>
       </div>
 
       <div v-else-if="modelError" class="error-overlay">
-        <p>模型加载失败: {{ modelError }}</p>
-        <button @click="retryLoad" class="retry-btn">重试</button>
+        <p>Model loading failed: {{ modelError }}</p>
+        <button @click="retryLoad" class="retry-btn">Retry</button>
       </div>
 
       <!-- Three.js 3D场景将在这里渲染 -->
@@ -41,19 +41,19 @@
       <div class="camera-controls">
         <button @click="resetCamera" class="control-btn">
           <i class="icon-home"></i>
-          重置视角
+          Reset View
         </button>
         <button @click="toggleAutoRotate" class="control-btn" :class="{ active: autoRotate }">
           <i class="icon-rotate"></i>
-          自动旋转
+          Auto Rotate
         </button>
         <button @click="animateToPreset('front')" class="control-btn">
           <i class="icon-view"></i>
-          正视图
+          front view
         </button>
         <button @click="animateToPreset('top')" class="control-btn">
           <i class="icon-view"></i>
-          俯视图
+          top view
         </button>
       </div>
 
@@ -61,7 +61,7 @@
       <div class="info-toggle">
         <button @click="toggleInfoPanel" class="control-btn" :class="{ active: showInfoPanel }">
           <i class="icon-info"></i>
-          信息
+          Info
         </button>
       </div>
     </div>
@@ -79,15 +79,15 @@
             <p class="description">{{ currentMonument?.description[currentLanguage] }}</p>
             <div class="metadata">
               <div class="meta-item">
-                <strong>位置:</strong>
+                <strong>Location:</strong>
                 {{ currentMonument?.location.city }}, {{ currentMonument?.location.region }}
               </div>
               <div class="meta-item">
-                <strong>时期:</strong>
+                <strong>Period:</strong>
                 {{ currentMonument?.period }}
               </div>
               <div class="meta-item">
-                <strong>重要性:</strong>
+                <strong>Significance:</strong>
                 {{ currentMonument?.significance }}
               </div>
             </div>
@@ -196,13 +196,13 @@ const initThreeJS = () => {
 const loadModel = async (modelPath) => {
   if (!sceneManager) {
     console.error('Scene manager not initialized')
-    showNotification('场景未初始化', '请刷新页面重试', 'error')
+    showNotification('Scene not initialized', 'Please refresh the page and try again', 'error')
     return
   }
 
   try {
     // 显示加载状态
-    showLoading('加载3D模型', '正在准备模型文件...')
+    showLoading('Loading 3D Model', 'Preparing model files...')
 
     // 清除之前的模型
     if (currentModel) {
@@ -210,7 +210,7 @@ const loadModel = async (modelPath) => {
       currentModel = null
     }
 
-    updateLoadingProgress(20, '正在下载模型文件...')
+    updateLoadingProgress(20, 'Downloading model files...')
 
     // 加载新模型
     console.log('Loading model:', modelPath)
@@ -221,14 +221,14 @@ const loadModel = async (modelPath) => {
       makeInteractive: true
     })
 
-    updateLoadingProgress(70, '正在处理模型数据...')
+    updateLoadingProgress(70, 'Processing model data...')
 
     // 添加交互热点
     if (interactionManager && currentMonument.value.interactivePoints) {
       addInteractiveHotspots(currentMonument.value.interactivePoints)
     }
 
-    updateLoadingProgress(90, '正在调整相机视角...')
+    updateLoadingProgress(90, 'Adjusting camera view...')
 
     // 动画到模型
     try {
@@ -244,18 +244,18 @@ const loadModel = async (modelPath) => {
       // 相机动画失败不应该阻止模型加载完成
     }
 
-    updateLoadingProgress(100, '加载完成')
+    updateLoadingProgress(100, 'Loading complete')
     console.log('Model loading completed, hiding loading overlay...')
 
     // 立即隐藏加载界面，然后显示成功通知
     hideLoading()
-    showNotification('模型加载成功', currentMonument.value?.name[currentLanguage.value], 'success')
+    showNotification('Model loaded successfully', currentMonument.value?.name[currentLanguage.value], 'success')
     monumentStore.setModelLoaded(true)
   } catch (error) {
     console.error('Failed to load model:', error)
     hideLoading()
-    showNotification('模型加载失败', error.message, 'error')
-    monumentStore.setModelError('模型加载失败: ' + error.message)
+    showNotification('Model loading failed', error.message, 'error')
+    monumentStore.setModelError('Model loading failed: ' + error.message)
   }
 }
 
@@ -437,19 +437,19 @@ const handleSearchResult = async (result) => {
   try {
     if (result.type === 'monument') {
       // 切换到选中的古迹
-      showNotification('正在切换古迹', result.title, 'info')
+      showNotification('Switching monument', result.title, 'info')
       await monumentStore.loadMonument(result.data.id)
     } else if (result.type === 'hotspot') {
       // 导航到热点
-      showNotification('正在导航到热点', result.title, 'info')
+      showNotification('Navigating to hotspot', result.title, 'info')
       await selectHotspot(result.data.id)
     }
 
     // 显示成功提示
-    showNotification('导航成功', '已到达: ' + result.title, 'success')
+    showNotification('Navigation successful', 'Arrived at: ' + result.title, 'success')
   } catch (error) {
     console.error('Failed to navigate to search result:', error)
-    showNotification('导航失败', '无法到达指定位置', 'error')
+    showNotification('Navigation failed', 'Unable to reach specified location', 'error')
   }
 }
 
