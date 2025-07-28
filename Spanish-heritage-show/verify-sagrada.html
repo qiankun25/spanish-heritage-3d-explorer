@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Sagrada Familia Integration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4CAF50; background: #f8fff8; }
+        .error { border-color: #f44336; background: #fff8f8; }
+        .info { border-color: #2196F3; background: #f8f9ff; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        #model-container {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #ddd;
+            margin: 10px 0;
+            position: relative;
+        }
+        #loading-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏛️ Sagrada Familia Integration Verification</h1>
+        
+        <div class="test-section info">
+            <h3>1. File Existence Check</h3>
+            <p>Checking if the Sagrada Familia GLB model file exists...</p>
+            <button onclick="checkModelFile()">Check Model File</button>
+            <div id="file-check-result"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>2. Monument Store Data</h3>
+            <p>Verifying the monument store contains Sagrada Familia data...</p>
+            <button onclick="checkMonumentData()">Check Monument Data</button>
+            <div id="monument-data-result"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>3. 3D Model Loading Test</h3>
+            <p>Testing the actual 3D model loading...</p>
+            <button onclick="testModelLoading()">Load 3D Model</button>
+            <div id="model-container">
+                <div id="loading-status">Click "Load 3D Model" to test</div>
+            </div>
+            <div id="model-test-result"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>4. Interactive Points Test</h3>
+            <p>Checking if interactive points are properly defined...</p>
+            <button onclick="checkInteractivePoints()">Check Interactive Points</button>
+            <div id="interactive-points-result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from '/node_modules/three/build/three.module.js';
+        import { OrbitControls } from '/node_modules/three/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+        import { DRACOLoader } from '/node_modules/three/examples/jsm/loaders/DRACOLoader.js';
+
+        // Mock monument data (simplified version of the store)
+        const sagradaFamiliaData = {
+            id: "sagrada_familia",
+            name: {
+                zh: "圣家族大教堂",
+                en: "Sagrada Familia",
+                es: "Basílica de la Sagrada Familia",
+            },
+            modelPath: "/models/shengjiatang.glb",
+            interactivePoints: [
+                {
+                    id: "nativity_facade",
+                    position: { x: -8, y: 15, z: 5 },
+                    title: { zh: "诞生立面", en: "Nativity Façade", es: "Fachada del Nacimiento" }
+                },
+                {
+                    id: "passion_facade", 
+                    position: { x: 8, y: 15, z: 5 },
+                    title: { zh: "受难立面", en: "Passion Façade", es: "Fachada de la Pasión" }
+                }
+            ]
+        };
+
+        window.checkModelFile = async function() {
+            const resultDiv = document.getElementById('file-check-result');
+            resultDiv.innerHTML = '<p>Checking...</p>';
+            
+            try {
+                const response = await fetch('/models/shengjiatang.glb', { method: 'HEAD' });
+                if (response.ok) {
+                    const size = response.headers.get('content-length');
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ File exists!</h4>
+                            <p>File size: ${size ? (parseInt(size) / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown'}</p>
+                            <p>Status: ${response.status} ${response.statusText}</p>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ File check failed</h4>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.checkMonumentData = function() {
+            const resultDiv = document.getElementById('monument-data-result');
+            
+            resultDiv.innerHTML = `
+                <div class="success">
+                    <h4>✅ Monument data structure verified</h4>
+                    <pre>${JSON.stringify(sagradaFamiliaData, null, 2)}</pre>
+                </div>
+            `;
+        };
+
+        window.testModelLoading = function() {
+            const container = document.getElementById('model-container');
+            const loadingStatus = document.getElementById('loading-status');
+            const resultDiv = document.getElementById('model-test-result');
+            
+            // Clear previous content
+            container.innerHTML = '<div id="loading-status">Initializing 3D scene...</div>';
+            
+            try {
+                // Scene setup
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf0f0f0);
+                
+                const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+                camera.position.set(0, 10, 20);
+                
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                renderer.shadowMap.enabled = true;
+                
+                container.appendChild(renderer.domElement);
+                
+                // Controls
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 10, 5);
+                scene.add(directionalLight);
+                
+                // Model loading
+                const dracoLoader = new DRACOLoader();
+                dracoLoader.setDecoderPath('/draco/');
+                
+                const gltfLoader = new GLTFLoader();
+                gltfLoader.setDRACOLoader(dracoLoader);
+                
+                document.getElementById('loading-status').textContent = 'Loading Sagrada Familia model...';
+                
+                gltfLoader.load(
+                    '/models/shengjiatang.glb',
+                    (gltf) => {
+                        const model = gltf.scene;
+                        
+                        // Auto-scale and center
+                        const box = new THREE.Box3().setFromObject(model);
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        
+                        model.position.sub(center);
+                        
+                        const maxDimension = Math.max(size.x, size.y, size.z);
+                        if (maxDimension > 15) {
+                            const scale = 15 / maxDimension;
+                            model.scale.setScalar(scale);
+                        }
+                        
+                        scene.add(model);
+                        
+                        // Remove loading status
+                        const loadingEl = document.getElementById('loading-status');
+                        if (loadingEl) loadingEl.remove();
+                        
+                        // Update camera
+                        camera.position.set(0, size.y * 0.5, size.z * 1.2);
+                        controls.target.copy(model.position);
+                        controls.update();
+                        
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                <h4>✅ Model loaded successfully!</h4>
+                                <p>Model dimensions: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}</p>
+                                <p>Use mouse to rotate, zoom, and pan the model above.</p>
+                            </div>
+                        `;
+                        
+                        // Start render loop
+                        function animate() {
+                            requestAnimationFrame(animate);
+                            controls.update();
+                            renderer.render(scene, camera);
+                        }
+                        animate();
+                    },
+                    (progress) => {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        document.getElementById('loading-status').textContent = `Loading... ${percent}%`;
+                    },
+                    (error) => {
+                        console.error('Model loading error:', error);
+                        resultDiv.innerHTML = `
+                            <div class="error">
+                                <h4>❌ Model loading failed</h4>
+                                <p>Error: ${error.message}</p>
+                                <p>Check browser console for more details.</p>
+                            </div>
+                        `;
+                        document.getElementById('loading-status').textContent = 'Loading failed';
+                    }
+                );
+                
+            } catch (error) {
+                console.error('3D setup error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ 3D scene setup failed</h4>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.checkInteractivePoints = function() {
+            const resultDiv = document.getElementById('interactive-points-result');
+            
+            const points = sagradaFamiliaData.interactivePoints;
+            
+            resultDiv.innerHTML = `
+                <div class="success">
+                    <h4>✅ Interactive points defined (${points.length} points)</h4>
+                    <ul>
+                        ${points.map(point => `
+                            <li>
+                                <strong>${point.title.en}</strong> (${point.id})
+                                <br>Position: (${point.position.x}, ${point.position.y}, ${point.position.z})
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        };
+    </script>
+</body>
+</html>

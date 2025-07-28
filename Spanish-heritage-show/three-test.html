@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THREE.js 导入测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+        #console-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 THREE.js 导入和热点测试</h1>
+        <p>这个页面用于测试THREE.js导入和热点坐标转换功能</p>
+        
+        <div id="test-results"></div>
+        
+        <canvas id="test-canvas" width="400" height="300"></canvas>
+        
+        <h3>控制台输出:</h3>
+        <div id="console-output"></div>
+    </div>
+
+    <script type="module">
+        // 模拟Vue组件中的THREE.js导入测试
+        const consoleOutput = document.getElementById('console-output');
+        const testResults = document.getElementById('test-results');
+        
+        function addToConsole(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            consoleOutput.textContent += logEntry;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function addTestResult(title, success, message) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `
+                <strong>${success ? '✅' : '❌'} ${title}</strong><br>
+                ${message}
+            `;
+            testResults.appendChild(resultDiv);
+        }
+
+        async function runTests() {
+            addToConsole('info', '开始THREE.js导入测试...');
+            
+            try {
+                // 测试1: 动态导入THREE.js
+                addToConsole('info', '正在导入THREE.js...');
+                const THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
+                addToConsole('info', 'THREE.js导入成功');
+                addTestResult('THREE.js导入', true, 'THREE.js模块导入成功');
+
+                // 测试2: 创建基本THREE.js对象
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, 400/300, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('test-canvas') });
+                
+                addToConsole('info', 'THREE.js基本对象创建成功');
+                addTestResult('THREE.js对象创建', true, '场景、相机、渲染器创建成功');
+
+                // 测试3: 热点坐标转换测试
+                const testHotspot = {
+                    position: { x: 0, y: 0, z: 5 }
+                };
+
+                function getHotspotStyle(point, camera, canvas) {
+                    try {
+                        const vector = new THREE.Vector3(point.position.x, point.position.y, point.position.z);
+                        vector.project(camera);
+
+                        const x = (vector.x * 0.5 + 0.5) * canvas.width;
+                        const y = (vector.y * -0.5 + 0.5) * canvas.height;
+
+                        return {
+                            position: 'absolute',
+                            left: `${x}px`,
+                            top: `${y}px`,
+                            transform: 'translate(-50%, -50%)'
+                        };
+                    } catch (error) {
+                        throw error;
+                    }
+                }
+
+                const hotspotStyle = getHotspotStyle(testHotspot, camera, document.getElementById('test-canvas'));
+                addToConsole('info', `热点样式计算结果: ${JSON.stringify(hotspotStyle)}`);
+                addTestResult('热点坐标转换', true, '热点3D到2D坐标转换成功');
+
+                // 测试4: 渲染一个简单场景
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                const cube = new THREE.Mesh(geometry, material);
+                scene.add(cube);
+
+                camera.position.z = 5;
+                renderer.render(scene, camera);
+
+                addToConsole('info', '简单场景渲染成功');
+                addTestResult('场景渲染', true, '绿色立方体渲染成功');
+
+                // 清理
+                renderer.dispose();
+                geometry.dispose();
+                material.dispose();
+
+                addToConsole('info', '所有测试完成！');
+
+            } catch (error) {
+                addToConsole('error', `测试失败: ${error.message}`);
+                addTestResult('THREE.js测试', false, error.message);
+            }
+        }
+
+        // 页面加载完成后运行测试
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 1000);
+        });
+    </script>
+</body>
+</html>
